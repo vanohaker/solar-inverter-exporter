@@ -5,6 +5,7 @@
 #include <LEAmDNS.h>
 #include <pico/cyw43_arch.h>
 #include <AsyncWebServer_RP2040W.h>
+// #include <ArduinoOTA.h>
 
 const char *app_version = "0.0.1"; // версия
 const char *ssid = "xxxxxxxxxxxxxxxx"; // имя сети
@@ -85,6 +86,10 @@ void setup() {
     resetFunc();
   }
 
+  if (MDNS.begin("solar-exporter")) {
+    Serial.println("MDNS responder started");
+  }
+
   // Выводим ip вдррес который получили по DHCP
   Serial.printf("Board IP address: %s\n", WiFi.localIP());
 
@@ -95,6 +100,9 @@ void setup() {
   server.on("/metrics", HTTP_GET, [](AsyncWebServerRequest * request)
   {
     handlerMetrics(request);
+  });
+  server.onNotFound([](AsyncWebServerRequest * request){
+    request->send(404, "text/html", "Not Found");
   });
   server.begin();
 
