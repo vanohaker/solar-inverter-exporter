@@ -110,12 +110,12 @@ void setup() {
   }
   // Если wifi успешно подключен то сообщение
   if (WiFi.status() == WL_CONNECTED) {
-    Serial.print("OK\n");
+    Serial.println("OK");
   }
 
   // если Wifi не подключился к точке доступа то перезагружаем плату и всё сначала
   if (WiFi.status() != WL_CONNECTED) {
-    Serial.print("ERROR\n");
+    Serial.println("ERROR");
     Serial.println("Reboot...!");
     delay(2000);
     rp2040.reboot();
@@ -128,22 +128,32 @@ void setup() {
   if (mdnsstatus) {
     Serial.println("OK");
   } else {
-    Serial.print("ERROR");
+    Serial.println("ERROR");
   }
 
   // Выводим ip вдррес который получили по DHCP
   Serial.printf("Board IP address: %d.%d.%d.%d\n", WiFi.localIP()[0], WiFi.localIP()[1], WiFi.localIP()[2], WiFi.localIP()[3]);
 
-  server.on("/", HTTP_GET, [](AsyncWebServerRequest * request)
-  {
+  server.on("/", HTTP_GET, [](AsyncWebServerRequest * request){
     handlerRoot(request);
+    printrequestdata(request);
   });
   server.on("/metrics", HTTP_GET, [](AsyncWebServerRequest * request){
     handlerMetrics(request);
     printrequestdata(request);
   });
+  server.on("/metrics", HTTP_HEAD, [](AsyncWebServerRequest * request){
+    digitalWrite(led, 1);
+    AsyncWebServerResponse *response = request->beginResponse(200, "text/plan", "OK");
+    request->send(response);
+    printrequestdata(request);
+    digitalWrite(led, 0);
+  });
   server.onNotFound([](AsyncWebServerRequest * request){
+    digitalWrite(led, 1);
     request->send(404, "text/html", "Not Found");
+    printrequestdata(request);
+    digitalWrite(led, 0);
   });
   server.begin();
 
