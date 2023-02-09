@@ -5,16 +5,19 @@
 #include <LEAmDNS.h>
 #include <pico/cyw43_arch.h>
 #include <AsyncWebServer_RP2040W.h>
-// #include <ArduinoOTA.h>
+#include <PicoOTA.h>
+#include <LittleFS.h>
 
 const char *app_version = "0.0.1"; // версия
 const char *ssid = "laborotory"; // имя сети
 const char *password = "Dabg3h9h"; // пароль wifi
 const char *dnsname = "solar-exporter"; // DNS имя экспортера
+unsigned char buff[32];
 
 const int led = LED_BUILTIN; // светодиод который будет моргать при активности
 
 AsyncWebServer server(80);
+size_t content_len;
 
 // Функция которая выводит главную страницу http://soler-exporter.local/
 void handlerRoot(AsyncWebServerRequest *request) {
@@ -64,6 +67,53 @@ void handlerMetrics(AsyncWebServerRequest *request) {
   digitalWrite(led, 0);
 }
 
+void handleUpdate(AsyncWebServerRequest *request) {
+  digitalWrite(led, 1);
+  StreamString temp;
+  temp.reserve(500);
+  temp.printf("<form method='POST' action='/update' enctype='multipart/form-data'><input type='file' name='update'><input type='submit' value='Update'></form>");
+  AsyncWebServerResponse *response = request->beginResponse(200, "text/html", temp);
+  request->send(response);
+  digitalWrite(led, 0);
+}
+
+void handleUpdateStatus(AsyncWebServerRequest *request) {
+  digitalWrite(led, 1);
+  AsyncWebServerResponse *response = request->beginResponse(200, "text/plain", "OK");
+  response->addHeader("X-debug", "handleUpdateStatus-end");
+  response->addHeader("Connection", "close");
+  request->send(response);
+  digitalWrite(led, 0);
+}
+
+void handleUpdateProcedure(AsyncWebServerRequest *request, String filename, size_t index, uint8_t *data, size_t len, bool final) {
+  digitalWrite(led, 1);
+
+  for (int i; i<len;i++){
+    Serial.print("index = ");
+    Serial.print(index);
+    Serial.print(" | i = ");
+    Serial.printf("%x", data[i]);
+  }
+  // if(!index){
+  //   Serial.printf("Update Start: %s\n", filename.c_str());
+  //   Update.runAsync(true);
+  // }
+  // if(!Update.hasError()){
+  //   if(Update.write(data, len) != len){
+  //     Update.printError(Serial);
+  //   }
+  // }
+  // if(final){
+  //   if(Update.end(true)){
+  //     Serial.printf("Update Success: %uB\n", index+len);
+  //   } else {
+  //     Update.printError(Serial);
+  //   }
+  // }
+  digitalWrite(led, 0);
+}
+
 void printrequestdata(AsyncWebServerRequest *request) {
   Serial.printf("%d.%d.%d.%d:", request->client()->remoteIP()[0], request->client()->remoteIP()[1], request->client()->remoteIP()[2], request->client()->remoteIP()[3]);
   Serial.printf("%i -> ", request->client()->remotePort());
@@ -84,7 +134,7 @@ void printrequestdata(AsyncWebServerRequest *request) {
   Serial.printf("%s ", request->methodToString());
   Serial.printf("%s \"", request->url().c_str());
   Serial.print(request->header("User-Agent"));
-  Serial.print("\"");
+  Serial.print("\" ");
   Serial.print("\n");
 }
 
@@ -134,6 +184,7 @@ void setup() {
   // Выводим ip вдррес который получили по DHCP
   Serial.printf("Board IP address: %d.%d.%d.%d\n", WiFi.localIP()[0], WiFi.localIP()[1], WiFi.localIP()[2], WiFi.localIP()[3]);
 
+  // GET methods
   server.on("/", HTTP_GET, [](AsyncWebServerRequest * request){
     handlerRoot(request);
     printrequestdata(request);
@@ -142,6 +193,19 @@ void setup() {
     handlerMetrics(request);
     printrequestdata(request);
   });
+  server.on("/update", HTTP_GET, [](AsyncWebServerRequest *request){
+    handleUpdate(request);
+    printrequestdata(request);
+  });
+
+  server.on("/update", HTTP_POST, [](AsyncWebServerRequest *request){
+    handleUpdateStatus(request);
+    printrequestdata(request);
+  },[](AsyncWebServerRequest *request, String filename, size_t index, uint8_t *data, size_t len, bool final){
+    handleUpdateProcedure(request, filename, index, data, len, final);
+  });
+
+  // HEAD methods
   server.on("/metrics", HTTP_HEAD, [](AsyncWebServerRequest * request){
     digitalWrite(led, 1);
     AsyncWebServerResponse *response = request->beginResponse(200, "text/plan", "OK");
