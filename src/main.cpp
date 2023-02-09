@@ -8,8 +8,9 @@
 // #include <ArduinoOTA.h>
 
 const char *app_version = "0.0.1"; // версия
-const char *ssid = "***************"; // имя сети
-const char *password = "*********"; // пароль wifi
+const char *ssid = "laborotory"; // имя сети
+const char *password = "Dabg3h9h"; // пароль wifi
+const char *dnsname = "solar-exporter"; // DNS имя экспортера
 
 const int led = LED_BUILTIN; // светодиод который будет моргать при активности
 
@@ -39,126 +40,107 @@ void handlerMetrics(AsyncWebServerRequest *request) {
   digitalWrite(led, 1);
   StreamString temp;
   temp.reserve(500);
-  temp.printf("<html>\
-  <head>\
-    <title>Solar Inverter SmartWatt ECO Exporter v0.0.1</title>\
-  </head>\
-  <body>\
-  # HELP solar_exporter_version_info is a version of solar exporter appplication started in raspbery pico w micro controller\
-  # TYPE solar_exporter_version_info gauge\
-  solar_exporter_version_info{version=\"%s\"} 1\
-  # HELP solar_exporter_board_temp is temperature of Raspbery Pico W board from analogReadTemp() function\
-  # TYPE solar_exporter_board_temp gauge\
-  solar_exporter_board_temp %s\
-  </body>\
-</html>", app_version, analogReadTemp());
-  request->send(200, "text/html", temp);
+  temp.printf("<html>\n\
+  <head>\n\
+    <title>Solar Inverter SmartWatt ECO Exporter v0.0.1</title>\n\
+  </head>\n\
+  <body>\n\
+  # HELP solar_exporter_version_info is a version of solar exporter appplication started in raspbery pico w micro controller</br>\n\
+  # TYPE solar_exporter_version_info gauge</br>\n");
+  temp.printf("solar_exporter_version_info{version=\"%s\"} 1</br>\n", app_version);
+  temp.printf("# HELP solar_exporter_wifi_firmwire is version of the firmwire that was used when compiling the exporte</br>\n\
+  # TYPE solar_exporter_wifi_firmwire gauge</br>\n");
+  temp.printf("solar_exporter_wifi_firmwire{version=\"%s\", wifi_driver_version=\"%s\"} 1</br>\n", app_version, WiFi.firmwareVersion());
+  temp.printf("# HELP solar_exporter_wifi_signal_strength is a strength of wifi signal</br>\n\
+  # TYPE solar_exporter_wifi_signal_strength gauge</br>\n");
+  temp.printf("solar_exporter_wifi_signal_strength{version=\"%s\"} %i</br>\n", app_version, WiFi.RSSI());
+  temp.printf("# HELP solar_exporter_board_temp is temperature of Raspbery Pico W board from analogReadTemp() function</br>\n\
+  # TYPE solar_exporter_board_temp gauge</br>\n");
+  temp.printf("solar_exporter_board_temp %.2f</br>\n", floorf(analogReadTemp() * 100) / 100);
+  temp.printf("</body>\n\
+</html>", floorf(analogReadTemp() * 100) / 100);
+  AsyncWebServerResponse *response = request->beginResponse(200, "text/html", temp);
+  request->send(response);
   digitalWrite(led, 0);
 }
 
-void printEncryptionType(int thisType) {
-  // read the encryption type and print out the name:
-  switch (thisType) {
-    case ENC_TYPE_WEP:
-      Serial.println("WEP");
-      break;
-    case ENC_TYPE_TKIP:
-      Serial.println("WPA");
-      break;
-    case ENC_TYPE_CCMP:
-      Serial.println("WPA2");
-      break;
-    case ENC_TYPE_NONE:
-      Serial.println("None");
-      break;
-    case ENC_TYPE_AUTO:
-      Serial.println("Auto");
-      break;
+void printrequestdata(AsyncWebServerRequest *request) {
+  Serial.printf("%d.%d.%d.%d:", request->client()->remoteIP()[0], request->client()->remoteIP()[1], request->client()->remoteIP()[2], request->client()->remoteIP()[3]);
+  Serial.printf("%i -> ", request->client()->remotePort());
+  Serial.printf("%d.%d.%d.%d:", request->client()->localIP()[0], request->client()->localIP()[1], request->client()->localIP()[2], request->client()->localIP()[3]);
+  Serial.printf("%i ", request->client()->localPort());
+  switch (request->version())
+  {
+  case 0:
+    Serial.print("HTTP/1.0 ");
+    break;
+  case 1:
+    Serial.print("HTTP/1.1 ");
+    break;
+  default:
+    Serial.print("HTTP/X.X ");
+    break;
   }
-}
-
-void listNetworks() {
-  // scan for nearby networks:
-  Serial.println("** Scan Networks **");
-  int numSsid = WiFi.scanNetworks();
-  if (numSsid == -1) {
-    Serial.println("Couldn't get a wifi connection");
-    while (true);
-  }
-
-  // print the list of networks seen:
-  Serial.print("number of available networks:");
-  Serial.println(numSsid);
-
-  // print the network number and name for each network found:
-  for (int thisNet = 0; thisNet < numSsid; thisNet++) {
-    Serial.print(thisNet);
-    Serial.print(") ");
-    Serial.print(WiFi.SSID(thisNet));
-    Serial.print("\tSignal: ");
-    Serial.print(WiFi.RSSI(thisNet));
-    Serial.print(" dBm");
-    Serial.print("\tEncryption: ");
-    printEncryptionType(WiFi.encryptionType(thisNet));
-  }
+  Serial.printf("%s ", request->methodToString());
+  Serial.printf("%s \"", request->url().c_str());
+  Serial.print(request->header("User-Agent"));
+  Serial.print("\"");
+  Serial.print("\n");
 }
 
 void setup() {
   // put your setup code here, to run once:
   Serial.begin(115200);
   delay(2000);
-  Serial.printf("Starting Firmware version %s\n", app_version);
-  String fv = WiFi.firmwareVersion();
-  if (fv != "1.1.0") {
-    Serial.printf("Wifi Firmware Version = %s\n", fv);
-    Serial.println("Please upgrade the firmware");
-  }
-  Serial.println("Wifi init");
-
-  listNetworks();
+  Serial.printf("Starting Firmware version: %s\n", app_version);
+  Serial.print("Wifi Firmware Version: "); 
+  Serial.println(WiFi.firmwareVersion());
+  Serial.print("Wifi init...");
   
   // инициализация wifi
   // WiFi.mode(WIFI_STA);
   WiFi.begin(ssid, password);
 
   delay(2000);
-  
-  Serial.printf("Status wifi %i\n", WiFi.status());
 
   // в процессе инициализцаии wifi ресуем иочку каждые 500 милисекунд
-  while (WiFi.status() == WL_CONNECTED) {
+  while (WiFi.status() != WL_CONNECTED) {
     delay(500);
     Serial.print(".");
   }
   // Если wifi успешно подключен то сообщение
   if (WiFi.status() == WL_CONNECTED) {
-    Serial.print("\n");
-    Serial.printf("Board successfully connected to %s\n", ssid);
+    Serial.print("OK\n");
   }
 
   // если Wifi не подключился к точке доступа то перезагружаем плату и всё сначала
   if (WiFi.status() != WL_CONNECTED) {
-    Serial.printf("Unable to connect to %s\n", ssid);
-    delay(500);
+    Serial.print("ERROR\n");
     Serial.println("Reboot...!");
-    delay(1000);
+    delay(2000);
     rp2040.reboot();
   }
 
-  if (MDNS.begin("solar-exporter")) {
-    Serial.println("MDNS responder started");
+  Serial.print("MDNS init...");
+
+  bool mdnsstatus = MDNS.begin(dnsname);
+
+  if (mdnsstatus) {
+    Serial.println("OK");
+  } else {
+    Serial.print("ERROR");
   }
 
   // Выводим ip вдррес который получили по DHCP
-  Serial.printf("Board IP address: %s\n", WiFi.localIP());
+  Serial.printf("Board IP address: %d.%d.%d.%d\n", WiFi.localIP()[0], WiFi.localIP()[1], WiFi.localIP()[2], WiFi.localIP()[3]);
 
   server.on("/", HTTP_GET, [](AsyncWebServerRequest * request)
   {
     handlerRoot(request);
   });
-  server.on("/metrics", HTTP_GET, [](AsyncWebServerRequest * request)
-  {
+  server.on("/metrics", HTTP_GET, [](AsyncWebServerRequest * request){
     handlerMetrics(request);
+    printrequestdata(request);
   });
   server.onNotFound([](AsyncWebServerRequest * request){
     request->send(404, "text/html", "Not Found");
