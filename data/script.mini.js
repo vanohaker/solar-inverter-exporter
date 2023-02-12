@@ -1,0 +1,1 @@
+window.onload=function(){var e=5,t=window.location.protocol+"//"+window.location.host+"/doreboot",n=setInterval(s,1e3);function s(){var s=document.getElementById("counter");e-=1,s.innerHTML=e,console.log(e),e==0&&(clearInterval(n),console.log(t),httpGet(t))}};function httpGet(e){var t=new XMLHttpRequest;t.open("GET",e,!1),t.send(null),t.ontimeout=e=>{}}
