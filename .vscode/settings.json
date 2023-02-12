@@ -2,6 +2,7 @@
     "files.associations": {
         "*.tcc": "cpp",
         "vector": "cpp",
-        "random": "cpp"
+        "random": "cpp",
+        "system_error": "cpp"
     }
 }
